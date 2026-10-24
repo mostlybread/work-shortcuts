@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f151c" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Shortcuts">
+<title>Work Shortcuts</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b5cad'/%3E%3Cpath d='M18 46h28M24 46l4-28h8l4 28M27 30h10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: compact one-screen grid of tiles, sections and links come from links.json */
+  :root {
+    --bg: #f3f5f8;
+    --surface: #ffffff;
+    --fg: #16202c;
+    --muted: #5b6878;
+    --line: #d9dfe7;
+    --accent: #0b5cad;
+    --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f151c; --surface: #18212b; --fg: #e6ecf2; --muted: #93a1b2; --line: #2a3644; --accent: #6fb1f5; color-scheme: dark; }
+  }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.35;
+  }
+  .wrap {
+    max-width: 760px; margin: 0 auto;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  h1 { margin: 0; font-size: 1.2rem; }
+  #sections { display: flex; flex-direction: column; gap: 14px; }
+  section { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  section h2 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  a {
+    display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+    min-height: 48px; padding: 6px 8px; color: var(--fg); text-decoration: none;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font-weight: 700;
+  }
+  a:hover { border-color: var(--accent); color: var(--accent); }
+  a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .code { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500; letter-spacing: 0.04em; color: var(--muted); white-space: nowrap; }
+  .note { margin: 0; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Work Shortcuts</h1>
+  <main id="sections"><p class="note">Loading…</p></main>
+</div>
+
+<script>
+  // Sections and links are listed in links.json. Links open in the same tab, so Back returns here.
+  const root = document.getElementById("sections");
+
+  function el(tag, className, text) {
+    const n = document.createElement(tag);
+    if (className) n.className = className;
+    if (text) n.textContent = text;
+    return n;
+  }
+
+  function render(data) {
+    root.replaceChildren(...data.sections.map((s) => {
+      const sec = el("section");
+      const ul = el("ul");
+      for (const l of s.links) {
+        const a = el("a");
+        a.href = l.url;
+        a.append(el("span", "", l.label));
+        if (l.code) a.append(el("span", "code", l.code));
+        const li = el("li");
+        li.append(a);
+        ul.append(li);
+      }
+      sec.append(el("h2", "", s.title), ul);
+      return sec;
+    }));
+  }
+
+  fetch("links.json", { cache: "no-cache" })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(render)
+    .catch(() => root.replaceChildren(el("p", "note", "Couldn't load the links. Check your connection and refresh.")));
+</script>
+</body>
+</html>

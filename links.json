@@ -1,0 +1,41 @@
+{
+  "sections": [
+    {
+      "title": "🚏 RTT · EMR",
+      "links": [
+        { "label": "St Pancras", "code": "STP", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:STP?stp=WVS&show=all&order=wtt&toc=EM" },
+        { "label": "Cricklewood", "code": "CRK", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:CRKLDAE?stp=WVS&show=all&order=wtt&toc=EM" },
+        { "label": "Kettering", "code": "KET", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:KET?stp=WVS&show=all&order=wtt&toc=EM" },
+        { "label": "Corby", "code": "COR", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:COR?stp=WVS&show=all&order=wtt&toc=EM" },
+        { "label": "Derby", "code": "DBY", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:DBY?stp=WVS&show=all&order=wtt&toc=EM" },
+        { "label": "Nottingham", "code": "NOT", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:NOT?stp=WVS&show=all&order=wtt&toc=EM" },
+        { "label": "Sheffield", "code": "SHF", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:SHF?stp=WVS&show=all&order=wtt&toc=EM" }
+      ]
+    },
+    {
+      "title": "🗺️ Signalling maps",
+      "links": [
+        { "label": "St Pancras", "code": "STP", "url": "https://www.opentraintimes.com/maps/signalling/tlk-north#T_STPX" },
+        { "label": "Kettering", "code": "KET", "url": "https://www.opentraintimes.com/maps/signalling/spc3#LINK_1" },
+        { "label": "Derby", "code": "DBY", "url": "https://www.opentraintimes.com/maps/signalling/derby#T_DRBY" },
+        { "label": "Nottingham", "code": "NOT", "url": "https://www.opentraintimes.com/maps/signalling/nottingham#T_NTNG" },
+        { "label": "Sheffield", "code": "SHF", "url": "https://www.opentraintimes.com/maps/signalling/spc5#T_SHEFFLD" }
+      ]
+    },
+    {
+      "title": "Thameslink · Cricklewood ⇄ St Pancras",
+      "links": [
+        { "label": "To St Pancras", "code": "CRI→STP", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:CRI/to/gb-nr:STP?stp=WVS&show=call&order=wtt&toc=TL" },
+        { "label": "To Cricklewood", "code": "STP→CRI", "url": "https://www.realtimetrains.co.uk/search/detailed/gb-nr:STP/to/gb-nr:CRI?stp=WVS&show=all&order=wtt&toc=TL" }
+      ]
+    },
+    {
+      "title": "Other",
+      "links": [
+        { "label": "EMR service updates", "code": "", "url": "https://www.eastmidlandsrailway.co.uk/service-updates" },
+        { "label": "TOC performance", "code": "", "url": "https://trains.im/ppm/" },
+        { "label": "Departure board", "code": "STP", "url": "https://railchecker.app/station/STP/detailed/" }
+      ]
+    }
+  ]
+}
