@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-  /* Layout: compact one-screen grid of tiles, sections and links come from links.json */
+  /* Layout: one full-width panel per station (name + code on the left, colour-coded link buttons on the right); "Other" links below */
   :root {
     --bg: #f3f5f8;
     --surface: #ffffff;
@@ -25,15 +25,28 @@
     --muted: #5b6878;
     --line: #d9dfe7;
     --accent: #0b5cad;
+    --dep: #0b5cad;   --dep-bg: #e6f0fb;
+    --map: #1f7a3f;   --map-bg: #e5f4ea;
+    --board: #9a5b00; --board-bg: #fdf1dc;
+    --tl: #a3195b;    --tl-bg: #fbe6f0;
+    --link: #4a5565;  --link-bg: #eef1f5;
     --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0f151c; --surface: #18212b; --fg: #e6ecf2; --muted: #93a1b2; --line: #2a3644; --accent: #6fb1f5; color-scheme: dark; }
+    :root {
+      --bg: #0f151c; --surface: #18212b; --fg: #e6ecf2; --muted: #93a1b2; --line: #2a3644; --accent: #6fb1f5;
+      --dep: #8cc2fa;   --dep-bg: #17304a;
+      --map: #7fd69c;   --map-bg: #173826;
+      --board: #f5c46b; --board-bg: #3a2c12;
+      --tl: #f59ac4;    --tl-bg: #3d1a2b;
+      --link: #c3cdd8;  --link-bg: #243140;
+      color-scheme: dark;
+    }
   }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
-    font-family: var(--font-body); font-size: 15px; line-height: 1.35;
+    font-family: var(--font-body); font-size: 15px; line-height: 1.3;
   }
   .wrap {
     max-width: 760px; margin: 0 auto;
@@ -41,33 +54,55 @@
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
-    display: flex; flex-direction: column; gap: 16px;
+    display: flex; flex-direction: column; gap: 14px;
   }
   h1 { margin: 0; font-size: 1.2rem; }
-  #sections { display: flex; flex-direction: column; gap: 14px; }
-  section { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  section h2 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
-  a {
-    display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
-    min-height: 48px; padding: 6px 8px; color: var(--fg); text-decoration: none;
-    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font-weight: 700;
+  h2 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  #main { display: flex; flex-direction: column; gap: 14px; }
+  .stations { display: flex; flex-direction: column; gap: 6px; }
+  .station {
+    display: flex; align-items: center; gap: 10px; min-width: 0;
+    padding: 8px 8px 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   }
-  a:hover { border-color: var(--accent); color: var(--accent); }
+  .name { flex: none; width: 6.6em; display: flex; flex-direction: column; }
+  .name strong { font-size: 0.98rem; }
+  .code { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.06em; color: var(--muted); }
+  .links { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  a.btn {
+    display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 10px;
+    border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 0.85rem; white-space: nowrap;
+    color: var(--c); background: var(--cb); border: 1px solid transparent;
+  }
+  a.btn:hover { border-color: var(--c); }
   a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .code { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500; letter-spacing: 0.04em; color: var(--muted); white-space: nowrap; }
+  a.btn svg { width: 16px; height: 16px; flex: none; }
+  .t-departures { --c: var(--dep); --cb: var(--dep-bg); }
+  .t-map { --c: var(--map); --cb: var(--map-bg); }
+  .t-board { --c: var(--board); --cb: var(--board-bg); }
+  .t-thameslink { --c: var(--tl); --cb: var(--tl-bg); }
+  .t-link { --c: var(--link); --cb: var(--link-bg); }
+  .other { display: flex; flex-wrap: wrap; gap: 6px; }
   .note { margin: 0; color: var(--muted); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Work Shortcuts</h1>
-  <main id="sections"><p class="note">Loading…</p></main>
+  <main id="main"><p class="note">Loading…</p></main>
 </div>
 
 <script>
-  // Sections and links are listed in links.json. Links open in the same tab, so Back returns here.
-  const root = document.getElementById("sections");
+  // Stations and links are listed in links.json. Links open in the same tab, so Back returns here.
+  const root = document.getElementById("main");
+
+  // Each link "type" gets its own colour, icon and default label.
+  const TYPES = {
+    departures: { label: "Departures", icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
+    map: { label: "Map", icon: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>' },
+    board: { label: "Board", icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>' },
+    thameslink: { label: "Thameslink", icon: '<path d="M5 12h14M13 6l6 6-6 6"/>' },
+    link: { label: "Link", icon: '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>' },
+  };
 
   function el(tag, className, text) {
     const n = document.createElement(tag);
@@ -76,22 +111,35 @@
     return n;
   }
 
+  function button(link) {
+    const type = TYPES[link.type] ? link.type : "link";
+    const a = el("a", "btn t-" + type);
+    a.href = link.url;
+    a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + TYPES[type].icon + "</svg>";
+    a.append(link.label || TYPES[type].label);
+    return a;
+  }
+
   function render(data) {
-    root.replaceChildren(...data.sections.map((s) => {
-      const sec = el("section");
-      const ul = el("ul");
-      for (const l of s.links) {
-        const a = el("a");
-        a.href = l.url;
-        a.append(el("span", "", l.label));
-        if (l.code) a.append(el("span", "code", l.code));
-        const li = el("li");
-        li.append(a);
-        ul.append(li);
-      }
-      sec.append(el("h2", "", s.title), ul);
-      return sec;
-    }));
+    const parts = [];
+    const stations = el("div", "stations");
+    for (const loc of data.locations || []) {
+      const panel = el("section", "station");
+      const name = el("div", "name");
+      name.append(el("strong", "", loc.name));
+      if (loc.code) name.append(el("span", "code", loc.code));
+      const links = el("div", "links");
+      links.append(...loc.links.map(button));
+      panel.append(name, links);
+      stations.append(panel);
+    }
+    parts.push(stations);
+    if (data.other && data.other.length) {
+      const other = el("div", "other");
+      other.append(...data.other.map(button));
+      parts.push(el("h2", "", "Other"), other);
+    }
+    root.replaceChildren(...parts);
   }
 
   // Show the saved copy straight away, then check for changes and redraw if there are any.

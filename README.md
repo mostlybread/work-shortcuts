@@ -4,13 +4,14 @@ A one-page set of work links, shown as tiles and served with GitHub Pages.
 
 ## Changing links
 
-All sections and links are in `links.json`. Each link has:
+Everything is in `links.json`:
 
-- `label`: the name on the tile
-- `code`: a short code shown under the name (can be `""`)
-- `url`: the address it opens (`https://…`, or `tel:` / `mailto:` for contacts)
+- `locations`: one panel per station, with `name`, `code` and `links`.
+  Each link has a `type` and a `url`, plus an optional `label` to override the default name.
+  Types (each has its own colour and icon): `departures`, `map`, `board`, `thameslink`, `link`.
+- `other`: extra links shown under "Other", each with `label` and `url`.
 
-Sections and links appear in the order they're listed. Edit the file on GitHub
+Panels and links appear in the order they're listed. Edit the file on GitHub
 and commit, and the site updates within a minute or two.
 
 ## Installing on a phone
