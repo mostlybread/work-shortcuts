@@ -8,6 +8,11 @@
 <meta name="theme-color" content="#0f151c" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-title" content="Shortcuts">
 <title>Work Shortcuts</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b5cad'/%3E%3Cpath d='M18 46h28M24 46l4-28h8l4 28M27 30h10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
@@ -89,10 +94,25 @@
     }));
   }
 
-  fetch("links.json", { cache: "no-cache" })
-    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(render)
-    .catch(() => root.replaceChildren(el("p", "note", "Couldn't load the links. Check your connection and refresh.")));
+  // Show the saved copy straight away, then check for changes and redraw if there are any.
+  let shown = "";
+  function show(text) {
+    if (text === shown) return;
+    shown = text;
+    render(JSON.parse(text));
+  }
+  const load = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); });
+
+  load("links.json")
+    .then(show)
+    .catch(() => {})
+    .then(() => load("links.json?fresh=" + Date.now()))
+    .then(show)
+    .catch(() => {
+      if (!shown) root.replaceChildren(el("p", "note", "Couldn't load the links. Check your connection and refresh."));
+    });
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
 </body>
 </html>
