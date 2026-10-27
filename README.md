@@ -14,8 +14,8 @@ outside this repo, and is ignored by git.
   Each link has a `type` (`departures`, `map`, `board`, `thameslink`, `link`) and a `url`,
   plus an optional `label`.
 - `contacts`: groups with a `title` and `items`; each item has a `name` and a
-  `phone` and/or `email` (add `"text": true` for a Text button), plus optional `links` ({label, url}).
-- `other`: web links for the Links section, each with `label` and `url`.
+  `phone` and/or `email` (add `"text": true` for a Text button), plus optional `icon` (emoji) and `links` ({label, url}). Groups can have an `icon` too.
+- `other`: web links for the Links section, each with `label`, `url` and an optional `icon`.
 
 To publish a change, re-encrypt and commit `links.enc.json`:
 
