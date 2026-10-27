@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-  /* Layout: three tabs (Stations, Contacts, Links); stations and contacts are full-width rows with colour-coded buttons on the right */
+  /* Layout: one scrolling page (Stations, Contacts, Links); stations and contacts are full-width rows with colour-coded buttons on the right */
   :root {
     --bg: #f3f5f8;
     --surface: #ffffff;
@@ -88,13 +88,6 @@
   .t-call, .t-text { --c: var(--call); --cb: var(--call-bg); }
   .t-email { --c: var(--mail); --cb: var(--mail-bg); }
   .other { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tabs { display: flex; gap: 4px; padding: 3px; background: var(--link-bg); border-radius: 10px; }
-  .tabs button {
-    flex: 1; font: inherit; font-size: 0.88rem; font-weight: 700; cursor: pointer;
-    min-height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--muted);
-  }
-  .tabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
-  .tabs button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
   .group { display: flex; flex-direction: column; gap: 6px; }
   .contact .name { width: auto; flex: 1; min-width: 0; }
   .contact .name strong { font-size: 0.92rem; }
@@ -118,11 +111,6 @@
 <body>
 <div class="wrap">
   <h1>Work Shortcuts</h1>
-  <div class="tabs" role="tablist" aria-label="Sections" hidden>
-    <button type="button" role="tab" id="tab-stations" data-tab="stations">Stations</button>
-    <button type="button" role="tab" id="tab-contacts" data-tab="contacts">Contacts</button>
-    <button type="button" role="tab" id="tab-links" data-tab="links">Links</button>
-  </div>
   <main id="main"><p class="note">Loading…</p></main>
 </div>
 
@@ -205,26 +193,13 @@
     return [other];
   }
 
-  const VIEWS = { stations: stationsView, contacts: contactsView, links: linksView };
-  const tabs = document.querySelector(".tabs");
-  let current = "stations";
-  try { current = localStorage.getItem("tab") || current; } catch (e) {}
-  if (!VIEWS[current]) current = "stations";
-  let data = null;
-
-  tabs.addEventListener("click", (e) => {
-    const t = e.target.closest("button[data-tab]");
-    if (!t) return;
-    current = t.dataset.tab;
-    try { localStorage.setItem("tab", current); } catch (e) {}
-    render(data);
-  });
-
   function render(d) {
-    data = d;
-    tabs.hidden = false;
-    for (const b of tabs.querySelectorAll("button")) b.setAttribute("aria-selected", String(b.dataset.tab === current));
-    root.replaceChildren(...VIEWS[current](d));
+    const heading = (t) => el("h2", "", t);
+    root.replaceChildren(
+      heading("Stations"), ...stationsView(d),
+      ...contactsView(d),
+      heading("Links"), ...linksView(d)
+    );
   }
 
   // links.enc.json is encrypted with a password (see tools/encrypt.mjs). The password is asked
@@ -264,7 +239,6 @@
   }
 
   function askPassword(file, wrong) {
-    tabs.hidden = true;
     const form = el("form", "unlock");
     const label = el("label", "", "Password");
     label.htmlFor = "password";

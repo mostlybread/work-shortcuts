@@ -15,7 +15,7 @@ outside this repo, and is ignored by git.
   plus an optional `label`.
 - `contacts`: groups with a `title` and `items`; each item has a `name` and a
   `phone` and/or `email` (add `"text": true` for a Text button).
-- `other`: web links for the Links tab, each with `label` and `url`.
+- `other`: web links for the Links section, each with `label` and `url`.
 
 To publish a change, re-encrypt and commit `links.enc.json`:
 
