@@ -89,10 +89,11 @@
   .t-email { --c: var(--mail); --cb: var(--mail-bg); }
   .other { display: flex; flex-wrap: wrap; gap: 6px; }
   .group { display: flex; flex-direction: column; gap: 6px; }
-  .contact .name { width: auto; flex: 1; min-width: 0; }
+  .contact { flex-wrap: wrap; }
+  .contact .name { width: auto; flex: 1 1 9em; min-width: 0; }
   .contact .name strong { font-size: 0.92rem; }
   .contact .code { overflow-wrap: anywhere; }
-  .contact .links { flex: none; justify-content: flex-end; }
+  .contact .links { flex: 0 1 auto; }
   .note { margin: 0; color: var(--muted); }
   .unlock { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 360px; }
   .unlock label { width: 100%; font-weight: 700; }
@@ -180,6 +181,7 @@
         if (c.phone) links.append(button({ type: "call", url: "tel:" + tel(c.phone) }));
         if (c.phone && c.text) links.append(button({ type: "text", url: "sms:" + tel(c.phone) }));
         if (c.email) links.append(button({ type: "email", url: "mailto:" + c.email }));
+        for (const l of c.links || []) links.append(button(l));
         row.append(name, links);
         return row;
       }));
