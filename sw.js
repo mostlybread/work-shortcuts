@@ -1,7 +1,7 @@
 // Serves the page from the phone's cache so it opens instantly (and offline),
 // then fetches fresh copies in the background for next time.
-const CACHE = "shortcuts-v2";
-const CORE = ["./", "index.html", "links.json", "manifest.webmanifest", "icons/icon-192.png"];
+const CACHE = "shortcuts-v3";
+const CORE = ["./", "index.html", "links.enc.json", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));

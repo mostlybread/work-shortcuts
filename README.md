@@ -4,15 +4,22 @@ A one-page set of work links, shown as tiles and served with GitHub Pages.
 
 ## Changing links
 
-Everything is in `links.json`:
+The links are stored encrypted in `links.enc.json`, and the page asks for the
+password once per phone. The readable source (`links.json`) is kept privately,
+outside this repo, and is ignored by git.
+
+`links.json` has three lists:
 
 - `locations`: one panel per station, with `name`, `code` and `links`.
-  Each link has a `type` and a `url`, plus an optional `label` to override the default name.
-  Types (each has its own colour and icon): `departures`, `map`, `board`, `thameslink`, `link`.
-- `other`: extra links shown under "Other", each with `label` and `url`.
+  Each link has a `type` (`departures`, `map`, `board`, `thameslink`, `link`) and a `url`,
+  plus an optional `label`.
+- `contacts`: groups with a `title` and `items`; each item has a `name` and a
+  `phone` and/or `email` (add `"text": true` for a Text button).
+- `other`: web links for the Links tab, each with `label` and `url`.
 
-Panels and links appear in the order they're listed. Edit the file on GitHub
-and commit, and the site updates within a minute or two.
+To publish a change, re-encrypt and commit `links.enc.json`:
+
+    SHORTCUTS_PASSWORD='…' node tools/encrypt.mjs path/to/links.json
 
 ## Installing on a phone
 
