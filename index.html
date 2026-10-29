@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-  /* Layout: one scrolling page of sections; every row has the same columns (symbol, name, colour-coded buttons) */
+  /* Layout: one scrolling page of sections with sticky section shortcuts; every row has the same columns (symbol, name, colour-coded buttons); quick links float bottom right */
   :root {
     --bg: #f3f5f8;
     --surface: #ffffff;
@@ -96,6 +96,49 @@
   .t-email { --c: var(--mail); --cb: var(--mail-bg); }
   .group { display: flex; flex-direction: column; gap: 8px; }
   .note { margin: 0; color: var(--muted); }
+  a.btn { -webkit-touch-callout: none; }
+
+  /* Section shortcuts */
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+  .jump {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; gap: 6px; overflow-x: auto;
+    margin: 0 calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+    background: var(--bg); border-bottom: 1px solid var(--line); scrollbar-width: none;
+  }
+  .jump::-webkit-scrollbar { display: none; }
+  .jump a {
+    flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 10px;
+    border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
+    color: var(--fg); text-decoration: none; font-size: 0.8rem; font-weight: 700; white-space: nowrap;
+  }
+  .group { scroll-margin-top: calc(60px + env(safe-area-inset-top, 0px)); }
+
+  /* Quick links, bottom right within thumb reach */
+  .quick {
+    position: fixed; z-index: 8; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+    right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 24px);
+  }
+  .quick a.btn { min-height: 44px; padding: 0 14px; font-size: 0.9rem; box-shadow: 0 2px 8px rgb(0 0 0 / 0.18); border-color: var(--c); }
+  .quick a.btn .star { font-size: 0.75rem; }
+  .pin-toggle {
+    font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; min-height: 36px; padding: 0 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  }
+  .pin-toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .pinning .pin-toggle { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .pin-help {
+    margin: 0; max-width: 15em; text-align: right; font-weight: 700; font-size: 0.8rem; padding: 6px 10px;
+    border-radius: 8px; background: var(--accent); color: var(--bg); box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+  }
+  .pinning #main a.btn { position: relative; border: 1px dashed var(--c); }
+  .pinning #main a.btn::after {
+    content: "☆"; position: absolute; top: -7px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.7rem; background: var(--surface); color: var(--muted); border: 1px solid var(--line);
+  }
+  .pinning #main a.btn.pinned::after { content: "★"; color: var(--board); border-color: var(--board); }
   .unlock { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 360px; }
   .unlock label { width: 100%; font-weight: 700; }
   .unlock input {
@@ -113,8 +156,10 @@
 <body>
 <div class="wrap">
   <h1>Work Shortcuts</h1>
+  <nav class="jump" id="jump" aria-label="Jump to section" hidden></nav>
   <main id="main"><p class="note">Loading…</p></main>
 </div>
+<nav class="quick" id="quick" aria-label="Quick links" hidden></nav>
 
 <script>
   // Stations, contacts and links come from links.enc.json. Links open in the same tab, so Back returns here.
@@ -139,10 +184,12 @@
     return n;
   }
 
-  function button(link) {
+  function button(link, quickLabel) {
     const type = TYPES[link.type] ? link.type : "link";
     const a = el("a", "btn t-" + type);
     a.href = link.url;
+    a.dataset.type = type;
+    a.dataset.quick = quickLabel || link.label || TYPES[type].label;
     a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + TYPES[type].icon + "</svg>";
     a.append(link.label || TYPES[type].label);
     return a;
@@ -169,6 +216,9 @@
 
   function section(icon, title, body) {
     const group = el("div", "group");
+    group.id = "s-" + title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    group.dataset.icon = icon || "";
+    group.dataset.title = title;
     const h = el("h2");
     if (icon) h.append(el("span", "emoji", icon));
     h.append(title);
@@ -178,28 +228,95 @@
 
   function stationsView(data) {
     return section("🚉", "Stations", rows(data.locations || [], (loc) =>
-      row(loc.code, "badge", loc.name, [], loc.links.map(button))));
+      row(loc.code, "badge", loc.name, [], loc.links.map((l) => button(l, loc.code + " " + (l.label || TYPES[l.type]?.label || "Link"))))));
   }
 
   function contactsView(data) {
     return (data.contacts || []).map((g) => section(g.icon, g.title, rows(g.items, (c) => {
       const buttons = [];
-      if (c.phone) buttons.push(button({ type: "call", url: "tel:" + tel(c.phone) }));
-      if (c.phone && c.text) buttons.push(button({ type: "text", url: "sms:" + tel(c.phone) }));
-      if (c.email) buttons.push(button({ type: "email", url: "mailto:" + c.email }));
-      for (const l of c.links || []) buttons.push(button(l));
+      if (c.phone) buttons.push(button({ type: "call", url: "tel:" + tel(c.phone) }, "Call " + c.name));
+      if (c.phone && c.text) buttons.push(button({ type: "text", url: "sms:" + tel(c.phone) }, "Text " + c.name));
+      if (c.email) buttons.push(button({ type: "email", url: "mailto:" + c.email }, "Email " + c.name));
+      for (const l of c.links || []) buttons.push(button(l, l.label));
       return row(c.icon, "mark", c.name, c.phone ? [c.phone] : [], buttons);
     })));
   }
 
   function linksView(data) {
     return section("🔗", "Links", rows(data.other || [], (o) =>
-      row(o.icon, "mark", o.label, [], [button({ type: "link", label: "Open", url: o.url })])));
+      row(o.icon, "mark", o.label, [], [button({ type: "link", label: "Open", url: o.url }, o.label)])));
   }
 
   function render(d) {
     root.replaceChildren(stationsView(d), ...contactsView(d), linksView(d));
+    const jump = document.getElementById("jump");
+    jump.replaceChildren(...[...root.querySelectorAll(".group")].map((g) => {
+      const a = el("a");
+      a.href = "#" + g.id;
+      if (g.dataset.icon) a.append(el("span", "", g.dataset.icon));
+      a.append(g.dataset.title);
+      a.addEventListener("click", (e) => { e.preventDefault(); g.scrollIntoView({ behavior: "smooth" }); });
+      return a;
+    }));
+    jump.hidden = false;
+    renderQuick();
   }
+
+  // Quick links: starred buttons always show, and the most-used ones fill the rest.
+  // Counts and stars are kept on this phone only.
+  const QUICK_STORE = "quick-links";
+  const QUICK_SLOTS = 4;
+  const quick = document.getElementById("quick");
+  let usage = {};
+  try { usage = JSON.parse(localStorage.getItem(QUICK_STORE)) || {}; } catch (e) {}
+  const saveUsage = () => { try { localStorage.setItem(QUICK_STORE, JSON.stringify(usage)); } catch (e) {} };
+  let pinning = false;
+
+  function renderQuick() {
+    const onPage = new Map([...root.querySelectorAll("a.btn")].map((a) => [a.getAttribute("href"), a]));
+    for (const a of onPage.values()) a.classList.toggle("pinned", !!usage[a.getAttribute("href")]?.pinned);
+    const known = Object.entries(usage).filter(([url]) => onPage.has(url));
+    const pinned = known.filter(([, u]) => u.pinned);
+    const used = known.filter(([, u]) => !u.pinned && u.count > 0)
+      .sort((a, b) => b[1].count - a[1].count || b[1].last - a[1].last)
+      .slice(0, Math.max(0, QUICK_SLOTS - pinned.length));
+    const items = [...used.reverse(), ...pinned].map(([url, u]) => {
+      const src = onPage.get(url);
+      const a = button({ type: src.dataset.type, url, label: src.dataset.quick }, src.dataset.quick);
+      if (u.pinned) a.append(el("span", "star", "★"));
+      return a;
+    });
+    const toggle = el("button", "pin-toggle", pinning ? "Done" : "☆ Star links");
+    toggle.type = "button";
+    toggle.addEventListener("click", () => setPinning(!pinning));
+    const help = pinning ? [el("p", "pin-help", "Tap any button to star or unstar it. Starred links always show here.")] : [];
+    quick.replaceChildren(...help, ...items, toggle);
+    quick.hidden = false;
+    root.style.paddingBottom = quick.offsetHeight + 12 + "px";
+  }
+
+  function setPinning(on) {
+    pinning = on;
+    document.body.classList.toggle("pinning", on);
+    renderQuick();
+  }
+
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a.btn");
+    if (!a) return;
+    const url = a.getAttribute("href");
+    const u = usage[url] || (usage[url] = { count: 0, last: 0 });
+    if (pinning) {
+      e.preventDefault();
+      if (quick.contains(a)) return;
+      u.pinned = !u.pinned;
+    } else {
+      u.count += 1;
+      u.last = Date.now();
+    }
+    saveUsage();
+    renderQuick();
+  });
 
 
   // links.enc.json is encrypted with a password (see tools/encrypt.mjs). The password is asked
