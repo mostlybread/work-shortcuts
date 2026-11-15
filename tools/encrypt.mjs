@@ -1,12 +1,14 @@
 // Encrypts the plain links file into links.enc.json, which is what the site loads.
-// Usage: SHORTCUTS_PASSWORD=... node tools/encrypt.mjs path/to/links.json
+// Usage: SHORTCUTS_PASSWORD=... node tools/encrypt.mjs path/to/links.json [output file]
+// The output defaults to links.enc.json. The wind noise form's shared file is report.enc.json.
 // Keeps the existing salt when the password is unchanged, so phones that are
 // already unlocked stay unlocked after an update.
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { webcrypto as crypto } from "node:crypto";
 
 const ITERATIONS = 600000;
-const OUT = new URL("../links.enc.json", import.meta.url);
+const OUT = process.argv[3] ? resolve(process.argv[3]) : new URL("../links.enc.json", import.meta.url);
 const b64 = (buf) => Buffer.from(buf).toString("base64");
 const unb64 = (s) => new Uint8Array(Buffer.from(s, "base64"));
 
@@ -43,4 +45,4 @@ const iv = crypto.getRandomValues(new Uint8Array(12));
 const key = await deriveKey(salt, ITERATIONS);
 const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plain));
 writeFileSync(OUT, JSON.stringify({ v: 1, iterations: ITERATIONS, salt: b64(salt), iv: b64(iv), data: b64(data) }) + "\n");
-console.log("Wrote links.enc.json");
+console.log("Wrote " + (process.argv[3] || "links.enc.json"));

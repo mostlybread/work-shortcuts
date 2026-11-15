@@ -6,8 +6,11 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f151c" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Wind noise">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Wind Noise Report</title>
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="wind-noise.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b5cad'/%3E%3Cpath d='M18 46h28M24 46l4-28h8l4 28M27 30h10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,6 +39,7 @@
     border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
     color: var(--fg); text-decoration: none; font-weight: 700; font-size: 0.85rem;
   }
+  .back[hidden] { display: none; }
   h1 { margin: 0; font-size: 1.25rem; }
   .note { margin: 0; color: var(--muted); font-size: 0.9rem; }
   form { display: flex; flex-direction: column; gap: 12px; }
@@ -43,9 +47,10 @@
     margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
     display: flex; flex-direction: column; gap: 8px; min-width: 0;
   }
-  legend, .field > label { padding: 0; font-weight: 700; font-size: 0.92rem; }
+  legend, .field > label, .sub { padding: 0; font-weight: 700; font-size: 0.92rem; }
   legend { float: left; width: 100%; margin-bottom: 8px; }
   legend + * { clear: both; }
+  .sub { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
   .hint { font-weight: 400; color: var(--muted); font-size: 0.82rem; }
   input, textarea {
     font: inherit; font-size: 1rem; width: 100%; box-sizing: border-box; min-height: 46px; padding: 8px 12px;
@@ -69,10 +74,11 @@
   .prefixes { display: flex; gap: 6px; }
   .prefixes .chip { min-width: 58px; }
   .picked { font-family: var(--font-mono); font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
+  .unit-name { font-family: var(--font-mono); }
   .error { color: var(--warn); font-size: 0.85rem; font-weight: 700; }
   .error:empty { display: none; }
   .invalid { border-color: var(--warn); }
-  .send {
+  .send, .unlock button {
     font: inherit; font-weight: 700; font-size: 1.05rem; cursor: pointer; min-height: 54px; border: 0; border-radius: 12px;
     background: var(--accent); color: var(--bg);
   }
@@ -86,12 +92,12 @@
     margin: 0; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; font-family: var(--font-body); font-size: 0.85rem;
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   }
-  .locked a { color: var(--accent); font-weight: 700; }
+  .unlock { display: flex; flex-direction: column; gap: 10px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <a class="back" href="./">← Shortcuts</a>
+  <a class="back" id="back" href="./" hidden>← Shortcuts</a>
   <h1>🌬️ 360 cab door wind noise</h1>
   <div id="app"><p class="note">Loading…</p></div>
 </div>
@@ -122,17 +128,7 @@
     <div class="error" id="units-err"></div>
   </fieldset>
 
-  <fieldset>
-    <legend>Cab <span class="hint">one or both</span></legend>
-    <div class="chips two" id="cabs"></div>
-    <div class="error" id="cabs-err"></div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Door <span class="hint">one or both</span></legend>
-    <div class="chips two" id="doors"></div>
-    <div class="error" id="doors-err"></div>
-  </fieldset>
+  <div id="faults" style="display:contents"></div>
 
   <div class="field">
     <label for="speed">Excessive above</label>
@@ -144,13 +140,12 @@
   </div>
 
   <div class="field">
-    <label for="name">Name</label>
-    <input id="name" autocomplete="name" required>
-    <label for="role">Role</label>
-    <input id="role" required>
-    <label for="pay">Pay number</label>
-    <input id="pay" inputmode="numeric" autocomplete="off" required>
-    <div class="error" id="you-err"></div>
+    <label for="name">Name <span class="hint">optional</span></label>
+    <input id="name" autocomplete="name">
+    <label for="role">Role <span class="hint">optional</span></label>
+    <input id="role">
+    <label for="pay">Pay number <span class="hint">optional</span></label>
+    <input id="pay" autocomplete="off">
   </div>
 
   <div class="field">
@@ -168,40 +163,81 @@
 </template>
 
 <script>
-  // The To and CC addresses live in the encrypted shortcuts data (links.enc.json → reports.windNoise),
-  // so they never appear in the public repo. The key is the one the shortcuts page saved on this phone.
+  // The To and CC addresses are kept encrypted so they never appear in the public repo.
+  // Tom's phone reads them from his unlocked shortcuts (links.enc.json → reports.windNoise).
+  // Anyone else unlocks report.enc.json once with the form's own shared password.
   const app = document.getElementById("app");
-  const KEY_STORE = "shortcuts-key";
+  const SHORTCUTS_KEY = "shortcuts-key";
+  const FORM_KEY = "wind-noise-key";
   const LAST_STORE = "wind-noise-last";
   const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
   const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
+  const load = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
 
-  function locked(text) {
-    const p = document.createElement("p");
-    p.className = "note locked";
-    p.innerHTML = text;
-    app.replaceChildren(p);
-  }
-
-  async function addresses() {
-    let raw = null;
-    try { raw = localStorage.getItem(KEY_STORE); } catch (e) {}
-    if (!raw) return null;
-    const key = await crypto.subtle.importKey("raw", unb64(raw), "AES-GCM", false, ["decrypt"]);
-    const file = await fetch("links.enc.json").then((r) => r.json());
+  async function decrypt(file, key) {
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(file.iv) }, key, unb64(file.data));
-    return JSON.parse(new TextDecoder().decode(plain)).reports?.windNoise || null;
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+  const importKey = (raw) => crypto.subtle.importKey("raw", unb64(raw), "AES-GCM", true, ["decrypt"]);
+
+  async function fromShortcuts() {
+    const raw = store.get(SHORTCUTS_KEY);
+    if (!raw) return null;
+    try { return (await decrypt(await load("links.enc.json"), await importKey(raw))).reports?.windNoise || null; }
+    catch (e) { return null; }
   }
 
-  // Toggle buttons. max limits how many can be picked at once.
-  function toggles(box, values, label, max) {
-    const picked = [];
+  async function fromFormFile(file) {
+    const raw = store.get(FORM_KEY);
+    if (!raw) return null;
+    try { return (await decrypt(file, await importKey(raw))).windNoise || null; }
+    catch (e) { return null; }
+  }
+
+  function askPassword(file, wrong) {
+    const form = document.createElement("form");
+    form.className = "unlock";
+    form.innerHTML =
+      '<div class="field"><label for="password">Password</label>' +
+      '<input type="password" id="password" autocomplete="current-password" required>' +
+      '<p class="note"></p></div><button type="submit">Unlock</button>';
+    const msg = form.querySelector(".note");
+    msg.textContent = wrong ? "That password didn't work. Try again." : "Enter the form's password once to unlock it on this phone. Ask the driver who shared the link.";
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector("button");
+      btn.disabled = true;
+      msg.textContent = "Unlocking…";
+      try {
+        const base = await crypto.subtle.importKey("raw", new TextEncoder().encode($("password").value), "PBKDF2", false, ["deriveKey"]);
+        const key = await crypto.subtle.deriveKey(
+          { name: "PBKDF2", hash: "SHA-256", salt: unb64(file.salt), iterations: file.iterations },
+          base, { name: "AES-GCM", length: 256 }, true, ["decrypt"]
+        );
+        const to = (await decrypt(file, key)).windNoise;
+        store.set(FORM_KEY, b64(await crypto.subtle.exportKey("raw", key)));
+        start(to);
+      } catch (err) {
+        askPassword(file, true);
+      }
+    });
+    app.replaceChildren(form);
+  }
+
+  // Toggle buttons. max limits how many can be picked at once; picked keeps the choices.
+  function toggles(box, values, picked, max, onChange) {
+    const sync = () => { for (const c of box.children) c.setAttribute("aria-pressed", String(picked.includes(c.dataset.v))); };
     for (const v of values) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "chip mono";
-      b.textContent = label(v);
-      b.setAttribute("aria-pressed", "false");
+      b.textContent = v;
+      b.dataset.v = v;
       b.addEventListener("click", () => {
         const i = picked.indexOf(v);
         if (i >= 0) picked.splice(i, 1);
@@ -209,13 +245,13 @@
           if (max && picked.length >= max) picked.shift();
           picked.push(v);
         }
-        for (const c of box.children) c.setAttribute("aria-pressed", String(picked.includes(c.dataset.v)));
-        box.dispatchEvent(new Event("change"));
+        picked.sort();
+        sync();
+        onChange && onChange();
       });
-      b.dataset.v = v;
       box.append(b);
     }
-    return picked;
+    sync();
   }
 
   const today = () => {
@@ -229,19 +265,33 @@
   function start(to) {
     app.replaceChildren($("form-tpl").content.cloneNode(true));
     const UNITS = Array.from({ length: 21 }, (_, i) => String(101 + i));
-    const units = toggles($("units"), UNITS, (v) => v, 2);
-    const cabs = toggles($("cabs"), ["DMC1", "DMC2"], (v) => v);
-    const doors = toggles($("doors"), ["E1", "F1"], (v) => v);
-    const showUnits = () => { $("units-picked").textContent = units.length ? units.map((u) => "360" + u).join(" + ") : ""; };
-    // Keep the two picked units in number order.
-    $("units").addEventListener("change", () => { units.sort(); showUnits(); $("units-err").textContent = ""; });
-    $("cabs").addEventListener("change", () => { $("cabs-err").textContent = ""; });
-    $("doors").addEventListener("change", () => { $("doors-err").textContent = ""; });
+    const units = [];
+    // Cab and door choices for each unit, kept if a unit is deselected and picked again.
+    const faults = {};
+
+    function renderFaults() {
+      $("units-picked").textContent = units.length ? units.map((u) => "360" + u).join(" + ") : "";
+      $("units-err").textContent = "";
+      $("faults").replaceChildren(...units.map((u) => {
+        const f = faults[u] || (faults[u] = { cabs: [], doors: [] });
+        const set = document.createElement("fieldset");
+        const legend = document.createElement("legend");
+        legend.innerHTML = 'Cab and door on <span class="unit-name"></span> <span class="hint">one or both of each</span>';
+        legend.querySelector(".unit-name").textContent = "360" + u;
+        const cabLabel = Object.assign(document.createElement("div"), { className: "sub", textContent: "Cab" });
+        const cabs = Object.assign(document.createElement("div"), { className: "chips two" });
+        const doorLabel = Object.assign(document.createElement("div"), { className: "sub", textContent: "Door" });
+        const doors = Object.assign(document.createElement("div"), { className: "chips two" });
+        const err = Object.assign(document.createElement("div"), { className: "error", id: "fault-err-" + u });
+        toggles(cabs, ["DMC1", "DMC2"], f.cabs, 0, () => { err.textContent = ""; });
+        toggles(doors, ["E1", "F1"], f.doors, 0, () => { err.textContent = ""; });
+        set.append(legend, cabLabel, cabs, doorLabel, doors, err);
+        return set;
+      }));
+    }
+    toggles($("units"), UNITS, units, 2, renderFaults);
 
     $("date").value = today();
-    // Clear a field's warning as soon as it's corrected.
-    $("speed").addEventListener("input", () => { $("speed").classList.remove("invalid"); $("speed-err").textContent = ""; });
-    for (const f of ["name", "role", "pay"]) $(f).addEventListener("input", () => { $(f).classList.remove("invalid"); $("you-err").textContent = ""; });
 
     const hc = $("headcode");
     hc.addEventListener("input", () => {
@@ -251,24 +301,30 @@
     for (const b of document.querySelectorAll("[data-prefix]")) {
       b.addEventListener("click", () => { hc.value = b.dataset.prefix; hc.focus(); hc.setSelectionRange(2, 2); });
     }
+    $("speed").addEventListener("input", () => { $("speed").classList.remove("invalid"); $("speed-err").textContent = ""; });
 
     // Speed, name, role, pay number and notes come back from the last report sent from this phone.
     let last = {};
-    try { last = JSON.parse(localStorage.getItem(LAST_STORE)) || {}; } catch (e) {}
+    try { last = JSON.parse(store.get(LAST_STORE)) || {}; } catch (e) {}
     for (const f of ["speed", "name", "role", "pay", "notes"]) if (last[f]) $(f).value = last[f];
 
     function check() {
       let ok = true;
-      const fail = (id, msg, input) => { $(id).textContent = msg; if (input) input.classList.add("invalid"); if (ok) (input || $(id)).scrollIntoView({ block: "center" }); ok = false; };
+      const fail = (id, msg, input) => {
+        $(id).textContent = msg;
+        if (input) input.classList.add("invalid");
+        if (ok) (input || $(id)).scrollIntoView({ block: "center" });
+        ok = false;
+      };
       for (const i of document.querySelectorAll(".invalid")) i.classList.remove("invalid");
       if (!/^[0-9A-Z]{4}$/.test(hc.value)) fail("headcode-err", "Enter all 4 characters of the headcode.", hc);
       if (!units.length) fail("units-err", "Pick at least one unit.");
-      if (!cabs.length) fail("cabs-err", "Pick DMC1, DMC2 or both.");
-      if (!doors.length) fail("doors-err", "Pick E1, F1 or both.");
+      for (const u of units) {
+        const f = faults[u];
+        if (!f.cabs.length || !f.doors.length) fail("fault-err-" + u, "Pick the cab and the door on 360" + u + ".");
+      }
       if (!(Number($("speed").value) > 0)) fail("speed-err", "Enter the speed in mph.", $("speed"));
-      const missing = ["name", "role", "pay"].filter((f) => !$(f).value.trim());
-      if (missing.length) fail("you-err", "Fill in your name, role and pay number.", $(missing[0]));
-      if (!$("date").value) { $("date").value = today(); }
+      if (!$("date").value) $("date").value = today();
       return ok;
     }
 
@@ -283,23 +339,27 @@
         "",
         "Date: " + longDate(v("date")),
         "Headcode: " + hc.value,
-        "Unit" + (units.length > 1 ? "s" : "") + ": " + unitText,
-        "Cab: " + both(cabs.slice().sort()),
-        "Door: " + both(doors.slice().sort()),
-        "Wind noise excessive above: " + v("speed") + " mph",
       ];
+      for (const u of units) {
+        const f = faults[u];
+        lines.push("Unit 360" + u + ": cab " + both(f.cabs) + ", door " + both(f.doors));
+      }
+      lines.push("Wind noise excessive above: " + v("speed") + " mph");
       if (v("notes")) lines.push("", "Notes:", v("notes"));
-      lines.push("", "Thanks,", v("name"), v("role"), "Pay number: " + v("pay"));
+      lines.push("", "Thanks,");
+      if (v("name")) lines.push(v("name"));
+      if (v("role")) lines.push(v("role"));
+      if (v("pay")) lines.push("Pay number: " + v("pay"));
       return { subject, body: lines.join("\n") };
     }
 
     $("form").addEventListener("submit", (e) => {
       e.preventDefault();
-      for (const id of ["headcode-err", "units-err", "cabs-err", "doors-err", "speed-err", "you-err"]) $(id).textContent = "";
+      for (const n of document.querySelectorAll(".error")) n.textContent = "";
       if (!check()) return;
       const saved = {};
       for (const f of ["speed", "name", "role", "pay", "notes"]) saved[f] = $(f).value.trim();
-      try { localStorage.setItem(LAST_STORE, JSON.stringify(saved)); } catch (e) {}
+      store.set(LAST_STORE, JSON.stringify(saved));
       const { subject, body } = email();
       const enc = (s) => encodeURIComponent(s).replace(/%0A/g, "%0D%0A");
       const params = (to.cc ? "cc=" + encodeURIComponent(to.cc) + "&" : "") + "subject=" + enc(subject) + "&body=" + enc(body);
@@ -313,12 +373,18 @@
     });
   }
 
-  addresses()
-    .then((to) => {
-      if (to && to.to) start(to);
-      else locked('This form needs your shortcuts unlocked on this phone. Open <a href="./">Work Shortcuts</a>, enter the password, then come back.');
-    })
-    .catch(() => locked('Couldn\'t load the form. Open <a href="./">Work Shortcuts</a> to check it\'s unlocked and you\'re online, then try again.'));
+  (async () => {
+    // Only show the way back to the shortcuts on a phone that has them unlocked.
+    $("back").hidden = !store.get(SHORTCUTS_KEY);
+    let to = await fromShortcuts();
+    if (to && to.to) return start(to);
+    let file;
+    try { file = await load("report.enc.json"); }
+    catch (e) { app.innerHTML = '<p class="note">Couldn\'t load the form. Check your connection and try again.</p>'; return; }
+    to = await fromFormFile(file);
+    if (to && to.to) start(to);
+    else askPassword(file, false);
+  })();
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
