@@ -93,6 +93,9 @@
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   }
   .unlock { display: flex; flex-direction: column; gap: 10px; }
+  a.send { display: flex; align-items: center; justify-content: center; text-decoration: none; min-height: 44px; font-size: 0.95rem; }
+  .after .secondary { min-height: 44px; }
+  .unit-block legend { font-size: 1rem; }
 </style>
 </head>
 <body>
@@ -107,18 +110,6 @@
   <div class="field">
     <label for="date">Date</label>
     <input type="date" id="date" required>
-  </div>
-
-  <div class="field">
-    <label for="headcode">Headcode <span class="hint">4 characters, e.g. 1Y01</span></label>
-    <div class="row">
-      <div class="prefixes">
-        <button type="button" class="chip mono" data-prefix="1Y">1Y</button>
-        <button type="button" class="chip mono" data-prefix="1H">1H</button>
-      </div>
-      <input id="headcode" class="mono" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="1Y01" required>
-    </div>
-    <div class="error" id="headcode-err"></div>
   </div>
 
   <fieldset>
@@ -149,15 +140,18 @@
   </div>
 
   <div class="field">
-    <label for="notes">Notes <span class="hint">optional</span></label>
+    <label for="notes">Other notes <span class="hint">optional</span></label>
     <textarea id="notes"></textarea>
   </div>
 
   <button type="submit" class="send">✉️ Create email</button>
   <div class="after" id="after" hidden>
-    <p class="note">Your mail app should open with the email ready to send. If it didn't, copy the text below and paste it into an email.</p>
     <pre id="preview"></pre>
-    <button type="button" class="secondary" id="copy">Copy email text</button>
+    <div class="chips two">
+      <button type="button" class="secondary" id="copy">📋 Copy email text</button>
+      <a class="send" id="send">✉️ Send</a>
+    </div>
+    <p class="note">Send opens your mail app with the email filled in. If it doesn't, copy the text and paste it into an email.</p>
   </div>
 </form>
 </template>
@@ -262,51 +256,95 @@
   const shortDate = (iso) => iso.split("-").reverse().join("/");
   const both = (list) => list.join(" and ");
 
+  function make(tag, className, text) {
+    const n = document.createElement(tag);
+    if (className) n.className = className;
+    if (text) n.textContent = text;
+    return n;
+  }
+
   function start(to) {
     app.replaceChildren($("form-tpl").content.cloneNode(true));
     const UNITS = Array.from({ length: 21 }, (_, i) => String(101 + i));
     const units = [];
-    // Cab and door choices for each unit, kept if a unit is deselected and picked again.
+    // Headcode, cabs, doors and cab notes for each unit, kept if a unit is deselected and picked again.
     const faults = {};
+    const hideEmail = () => { $("after").hidden = true; };
+
+    function unitBlock(u) {
+      const f = faults[u] || (faults[u] = { hc: "", cabs: [], doors: [], notes: {} });
+      const set = make("fieldset", "unit-block");
+      const legend = make("legend", "unit-name", "360" + u);
+
+      // Headcode for this unit
+      const hcLabel = make("label", "sub", "Headcode");
+      const hc = make("input", "mono");
+      hc.id = "hc-" + u;
+      hcLabel.htmlFor = hc.id;
+      Object.assign(hc, { maxLength: 4, autocomplete: "off", spellcheck: false, placeholder: "1Y01", value: f.hc });
+      hc.setAttribute("autocapitalize", "characters");
+      const hcErr = make("div", "error");
+      hcErr.id = "hc-err-" + u;
+      hc.addEventListener("input", () => {
+        hc.value = hc.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 4);
+        f.hc = hc.value;
+        hc.classList.remove("invalid"); hcErr.textContent = "";
+      });
+      const prefixes = make("div", "prefixes");
+      for (const pre of ["1Y", "1H"]) {
+        const b = make("button", "chip mono", pre);
+        b.type = "button";
+        b.addEventListener("click", () => { hc.value = f.hc = pre; hc.focus(); hc.setSelectionRange(2, 2); hcErr.textContent = ""; });
+        prefixes.append(b);
+      }
+      const hcRow = make("div", "row");
+      hcRow.append(prefixes, hc);
+
+      // Cab and door, then a notes box for each cab picked
+      const err = make("div", "error");
+      err.id = "fault-err-" + u;
+      const cabs = make("div", "chips two");
+      const doors = make("div", "chips two");
+      const notes = make("div", "");
+      notes.style.display = "contents";
+      const renderNotes = () => {
+        notes.replaceChildren(...f.cabs.flatMap((c) => {
+          const label = make("label", "sub");
+          label.innerHTML = c + ' notes <span class="hint">optional</span>';
+          const t = make("textarea");
+          t.id = "note-" + u + "-" + c;
+          label.htmlFor = t.id;
+          t.value = f.notes[c] || "";
+          t.addEventListener("input", () => { f.notes[c] = t.value; });
+          return [label, t];
+        }));
+      };
+      toggles(cabs, ["DMC1", "DMC2"], f.cabs, 0, () => { err.textContent = ""; renderNotes(); });
+      toggles(doors, ["E1", "F1"], f.doors, 0, () => { err.textContent = ""; });
+      renderNotes();
+
+      set.append(legend, hcLabel, hcRow, hcErr, make("div", "sub", "Cab"), cabs, make("div", "sub", "Door"), doors, err, notes);
+      return set;
+    }
 
     function renderFaults() {
       $("units-picked").textContent = units.length ? units.map((u) => "360" + u).join(" + ") : "";
       $("units-err").textContent = "";
-      $("faults").replaceChildren(...units.map((u) => {
-        const f = faults[u] || (faults[u] = { cabs: [], doors: [] });
-        const set = document.createElement("fieldset");
-        const legend = document.createElement("legend");
-        legend.innerHTML = 'Cab and door on <span class="unit-name"></span> <span class="hint">one or both of each</span>';
-        legend.querySelector(".unit-name").textContent = "360" + u;
-        const cabLabel = Object.assign(document.createElement("div"), { className: "sub", textContent: "Cab" });
-        const cabs = Object.assign(document.createElement("div"), { className: "chips two" });
-        const doorLabel = Object.assign(document.createElement("div"), { className: "sub", textContent: "Door" });
-        const doors = Object.assign(document.createElement("div"), { className: "chips two" });
-        const err = Object.assign(document.createElement("div"), { className: "error", id: "fault-err-" + u });
-        toggles(cabs, ["DMC1", "DMC2"], f.cabs, 0, () => { err.textContent = ""; });
-        toggles(doors, ["E1", "F1"], f.doors, 0, () => { err.textContent = ""; });
-        set.append(legend, cabLabel, cabs, doorLabel, doors, err);
-        return set;
-      }));
+      $("faults").replaceChildren(...units.map(unitBlock));
     }
     toggles($("units"), UNITS, units, 2, renderFaults);
 
     $("date").value = today();
-
-    const hc = $("headcode");
-    hc.addEventListener("input", () => {
-      hc.value = hc.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 4);
-      hc.classList.remove("invalid"); $("headcode-err").textContent = "";
-    });
-    for (const b of document.querySelectorAll("[data-prefix]")) {
-      b.addEventListener("click", () => { hc.value = b.dataset.prefix; hc.focus(); hc.setSelectionRange(2, 2); });
-    }
     $("speed").addEventListener("input", () => { $("speed").classList.remove("invalid"); $("speed-err").textContent = ""; });
 
-    // Speed, name, role, pay number and notes come back from the last report sent from this phone.
+    // Speed, name, role, pay number and other notes come back from the last report made on this phone.
     let last = {};
     try { last = JSON.parse(store.get(LAST_STORE)) || {}; } catch (e) {}
     for (const f of ["speed", "name", "role", "pay", "notes"]) if (last[f]) $(f).value = last[f];
+
+    // Any change after the email is shown hides it, so an out-of-date email can't be sent.
+    $("form").addEventListener("input", (e) => { if (!$("after").contains(e.target)) hideEmail(); });
+    $("form").addEventListener("click", (e) => { if (e.target.closest("button") && !$("after").contains(e.target)) hideEmail(); });
 
     function check() {
       let ok = true;
@@ -317,10 +355,10 @@
         ok = false;
       };
       for (const i of document.querySelectorAll(".invalid")) i.classList.remove("invalid");
-      if (!/^[0-9A-Z]{4}$/.test(hc.value)) fail("headcode-err", "Enter all 4 characters of the headcode.", hc);
       if (!units.length) fail("units-err", "Pick at least one unit.");
       for (const u of units) {
         const f = faults[u];
+        if (!/^[0-9A-Z]{4}$/.test(f.hc)) fail("hc-err-" + u, "Enter all 4 characters of the headcode for 360" + u + ".", $("hc-" + u));
         if (!f.cabs.length || !f.doors.length) fail("fault-err-" + u, "Pick the cab and the door on 360" + u + ".");
       }
       if (!(Number($("speed").value) > 0)) fail("speed-err", "Enter the speed in mph.", $("speed"));
@@ -329,23 +367,23 @@
     }
 
     function email() {
-      const unitText = units.map((u) => "360" + u).join(" + ");
       const v = (id) => $(id).value.trim();
-      const subject = "Class 360 cab door wind noise - " + hc.value + " - " + unitText + " - " + shortDate(v("date"));
+      const tag = units.map((u) => "360" + u + " (" + faults[u].hc + ")").join(" + ");
+      const subject = "Class 360 cab door wind noise - " + tag + " - " + shortDate(v("date"));
       const lines = [
         "Hello Maintenance Control,",
         "",
         "Please could you log the following report of excessive wind noise from a cab door.",
         "",
         "Date: " + longDate(v("date")),
-        "Headcode: " + hc.value,
       ];
       for (const u of units) {
         const f = faults[u];
-        lines.push("Unit 360" + u + ": cab " + both(f.cabs) + ", door " + both(f.doors));
+        lines.push("", "Unit 360" + u, "Headcode: " + f.hc, "Cab: " + both(f.cabs), "Door: " + both(f.doors));
+        for (const c of f.cabs) if ((f.notes[c] || "").trim()) lines.push(c + " notes: " + f.notes[c].trim());
       }
-      lines.push("Wind noise excessive above: " + v("speed") + " mph");
-      if (v("notes")) lines.push("", "Notes:", v("notes"));
+      lines.push("", "Wind noise excessive above: " + v("speed") + " mph");
+      if (v("notes")) lines.push("", "Other notes:", v("notes"));
       lines.push("", "Thanks,");
       if (v("name")) lines.push(v("name"));
       if (v("role")) lines.push(v("role"));
@@ -364,12 +402,15 @@
       const enc = (s) => encodeURIComponent(s).replace(/%0A/g, "%0D%0A");
       const params = (to.cc ? "cc=" + encodeURIComponent(to.cc) + "&" : "") + "subject=" + enc(subject) + "&body=" + enc(body);
       $("preview").textContent = "To: " + to.to + (to.cc ? "\nCC: " + to.cc : "") + "\nSubject: " + subject + "\n\n" + body;
-      $("after").hidden = false;
-      $("copy").onclick = async () => {
-        try { await navigator.clipboard.writeText($("preview").textContent); $("copy").textContent = "Copied ✓"; }
-        catch (err) { $("copy").textContent = "Couldn't copy: press and hold the text instead"; }
+      $("send").href = "mailto:" + to.to + "?" + params;
+      const copy = $("copy");
+      copy.textContent = "📋 Copy email text";
+      copy.onclick = async () => {
+        try { await navigator.clipboard.writeText(body); copy.textContent = "Copied ✓"; }
+        catch (err) { copy.textContent = "Press and hold the text to copy"; }
       };
-      location.href = "mailto:" + to.to + "?" + params;
+      $("after").hidden = false;
+      $("after").scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
