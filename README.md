@@ -16,6 +16,9 @@ outside this repo, and is ignored by git.
 - `contacts`: groups with a `title` and `items`; each item has a `name` and a
   `phone` and/or `email` (add `"text": true` for a Text button), plus optional `icon` (emoji) and `links` ({label, url}). Groups can have an `icon` too.
 - `other`: web links for the Links section, each with `label`, `url` and an optional `icon`.
+- `reports`: addresses for report forms. `reports.windNoise` has `to` and `cc` for the
+  360 cab door wind noise form (`wind-noise.html`), which reads them with the key the
+  shortcuts page saved on the phone, so they stay out of this public repo.
 
 To publish a change, re-encrypt and commit `links.enc.json`:
 
