@@ -1,7 +1,7 @@
 // Serves the page from the phone's cache so it opens instantly (and offline),
 // then fetches fresh copies in the background for next time.
-const CACHE = "shortcuts-v8";
-const CORE = ["./", "index.html", "links.enc.json", "manifest.webmanifest", "icons/icon-192.png"];
+const CACHE = "shortcuts-v9";
+const CORE = ["./", "index.html", "wind-noise.html", "links.enc.json", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
@@ -38,7 +38,9 @@ self.addEventListener("fetch", (e) => {
   // Stale-while-revalidate: answer from cache, refresh in the background.
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const key = req.mode === "navigate" ? "./" : req;
+      // The shortcuts page is cached under "./"; other pages (like the wind noise form) under their own address.
+      const home = url.pathname.endsWith("/") || url.pathname.endsWith("/index.html");
+      const key = req.mode === "navigate" ? (home ? "./" : url.origin + url.pathname) : req;
       const cached = await cache.match(key, { ignoreSearch: true });
       const fresh = fetch(req, { cache: "no-cache" })
         .then((res) => {
