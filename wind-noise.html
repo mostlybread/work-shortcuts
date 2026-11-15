@@ -96,6 +96,9 @@
   a.send { display: flex; align-items: center; justify-content: center; text-decoration: none; min-height: 44px; font-size: 0.95rem; }
   .after .secondary { min-height: 44px; }
   .unit-block legend { font-size: 1rem; }
+  .cab-block { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--accent-bg); }
+  .cab-title { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+  .cab-block input, .cab-block textarea, .cab-block .chip:not([aria-pressed="true"]) { background: var(--surface); }
 </style>
 </head>
 <body>
@@ -267,63 +270,71 @@
     app.replaceChildren($("form-tpl").content.cloneNode(true));
     const UNITS = Array.from({ length: 21 }, (_, i) => String(101 + i));
     const units = [];
-    // Headcode, cabs, doors and cab notes for each unit, kept if a unit is deselected and picked again.
+    // Cabs for each unit, and each cab's headcode, doors and notes, kept if deselected and picked again.
     const faults = {};
     const hideEmail = () => { $("after").hidden = true; };
 
-    function unitBlock(u) {
-      const f = faults[u] || (faults[u] = { hc: "", cabs: [], doors: [], notes: {} });
-      const set = make("fieldset", "unit-block");
-      const legend = make("legend", "unit-name", "360" + u);
+    // One box per picked cab, with its own headcode, doors and notes.
+    function cabBlock(u, c, d) {
+      const id = u + "-" + c;
+      const box = make("div", "cab-block");
+      const title = make("div", "cab-title", c);
 
-      // Headcode for this unit
       const hcLabel = make("label", "sub", "Headcode");
       const hc = make("input", "mono");
-      hc.id = "hc-" + u;
+      hc.id = "hc-" + id;
       hcLabel.htmlFor = hc.id;
-      Object.assign(hc, { maxLength: 4, autocomplete: "off", spellcheck: false, placeholder: "1Y01", value: f.hc });
+      Object.assign(hc, { maxLength: 4, autocomplete: "off", spellcheck: false, placeholder: "1Y01", value: d.hc });
       hc.setAttribute("autocapitalize", "characters");
       const hcErr = make("div", "error");
-      hcErr.id = "hc-err-" + u;
+      hcErr.id = "hc-err-" + id;
       hc.addEventListener("input", () => {
         hc.value = hc.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 4);
-        f.hc = hc.value;
+        d.hc = hc.value;
         hc.classList.remove("invalid"); hcErr.textContent = "";
       });
       const prefixes = make("div", "prefixes");
       for (const pre of ["1Y", "1H"]) {
         const b = make("button", "chip mono", pre);
         b.type = "button";
-        b.addEventListener("click", () => { hc.value = f.hc = pre; hc.focus(); hc.setSelectionRange(2, 2); hcErr.textContent = ""; });
+        b.addEventListener("click", () => { hc.value = d.hc = pre; hc.focus(); hc.setSelectionRange(2, 2); hcErr.textContent = ""; });
         prefixes.append(b);
       }
       const hcRow = make("div", "row");
       hcRow.append(prefixes, hc);
 
-      // Cab and door, then a notes box for each cab picked
-      const err = make("div", "error");
-      err.id = "fault-err-" + u;
-      const cabs = make("div", "chips two");
       const doors = make("div", "chips two");
-      const notes = make("div", "");
-      notes.style.display = "contents";
-      const renderNotes = () => {
-        notes.replaceChildren(...f.cabs.flatMap((c) => {
-          const label = make("label", "sub");
-          label.innerHTML = c + ' notes <span class="hint">optional</span>';
-          const t = make("textarea");
-          t.id = "note-" + u + "-" + c;
-          label.htmlFor = t.id;
-          t.value = f.notes[c] || "";
-          t.addEventListener("input", () => { f.notes[c] = t.value; });
-          return [label, t];
-        }));
-      };
-      toggles(cabs, ["DMC1", "DMC2"], f.cabs, 0, () => { err.textContent = ""; renderNotes(); });
-      toggles(doors, ["E1", "F1"], f.doors, 0, () => { err.textContent = ""; });
-      renderNotes();
+      const doorErr = make("div", "error");
+      doorErr.id = "door-err-" + id;
+      toggles(doors, ["E1", "F1"], d.doors, 0, () => { doorErr.textContent = ""; });
 
-      set.append(legend, hcLabel, hcRow, hcErr, make("div", "sub", "Cab"), cabs, make("div", "sub", "Door"), doors, err, notes);
+      const noteLabel = make("label", "sub");
+      noteLabel.innerHTML = 'Notes <span class="hint">optional</span>';
+      const note = make("textarea");
+      note.id = "note-" + id;
+      noteLabel.htmlFor = note.id;
+      note.value = d.notes;
+      note.addEventListener("input", () => { d.notes = note.value; });
+
+      box.append(title, hcLabel, hcRow, hcErr, make("div", "sub", "Door"), doors, doorErr, noteLabel, note);
+      return box;
+    }
+
+    function unitBlock(u) {
+      const f = faults[u] || (faults[u] = { cabs: [], cab: {} });
+      const set = make("fieldset", "unit-block");
+      const legend = make("legend", "unit-name", "360" + u);
+      const cabs = make("div", "chips two");
+      const err = make("div", "error");
+      err.id = "cab-err-" + u;
+      const blocks = make("div", "");
+      blocks.style.display = "contents";
+      const renderCabs = () => {
+        blocks.replaceChildren(...f.cabs.map((c) => cabBlock(u, c, f.cab[c] || (f.cab[c] = { hc: "", doors: [], notes: "" }))));
+      };
+      toggles(cabs, ["DMC1", "DMC2"], f.cabs, 0, () => { err.textContent = ""; renderCabs(); });
+      renderCabs();
+      set.append(legend, make("div", "sub", "Cab"), cabs, err, blocks);
       return set;
     }
 
@@ -358,8 +369,12 @@
       if (!units.length) fail("units-err", "Pick at least one unit.");
       for (const u of units) {
         const f = faults[u];
-        if (!/^[0-9A-Z]{4}$/.test(f.hc)) fail("hc-err-" + u, "Enter all 4 characters of the headcode for 360" + u + ".", $("hc-" + u));
-        if (!f.cabs.length || !f.doors.length) fail("fault-err-" + u, "Pick the cab and the door on 360" + u + ".");
+        if (!f.cabs.length) fail("cab-err-" + u, "Pick DMC1, DMC2 or both on 360" + u + ".");
+        for (const c of f.cabs) {
+          const d = f.cab[c], id = u + "-" + c;
+          if (!/^[0-9A-Z]{4}$/.test(d.hc)) fail("hc-err-" + id, "Enter all 4 characters of the headcode.", $("hc-" + id));
+          if (!d.doors.length) fail("door-err-" + id, "Pick E1, F1 or both.");
+        }
       }
       if (!(Number($("speed").value) > 0)) fail("speed-err", "Enter the speed in mph.", $("speed"));
       if (!$("date").value) $("date").value = today();
@@ -368,8 +383,8 @@
 
     function email() {
       const v = (id) => $(id).value.trim();
-      const tag = units.map((u) => "360" + u + " (" + faults[u].hc + ")").join(" + ");
-      const subject = "Class 360 cab door wind noise - " + tag + " - " + shortDate(v("date"));
+      const headcodes = [...new Set(units.flatMap((u) => faults[u].cabs.map((c) => faults[u].cab[c].hc)))];
+      const subject = "Class 360 cab door wind noise - " + units.map((u) => "360" + u).join(" + ") + " - " + headcodes.join(", ") + " - " + shortDate(v("date"));
       const lines = [
         "Hello Maintenance Control,",
         "",
@@ -379,8 +394,11 @@
       ];
       for (const u of units) {
         const f = faults[u];
-        lines.push("", "Unit 360" + u, "Headcode: " + f.hc, "Cab: " + both(f.cabs), "Door: " + both(f.doors));
-        for (const c of f.cabs) if ((f.notes[c] || "").trim()) lines.push(c + " notes: " + f.notes[c].trim());
+        for (const c of f.cabs) {
+          const d = f.cab[c];
+          lines.push("", "Unit 360" + u + ", " + c, "Headcode: " + d.hc, "Door: " + both(d.doors));
+          if (d.notes.trim()) lines.push("Notes: " + d.notes.trim());
+        }
       }
       lines.push("", "Wind noise excessive above: " + v("speed") + " mph");
       if (v("notes")) lines.push("", "Other notes:", v("notes"));
