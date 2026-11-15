@@ -20,6 +20,14 @@ outside this repo, and is ignored by git.
   360 cab door wind noise form (`wind-noise.html`), which reads them with the key the
   shortcuts page saved on the phone, so they stay out of this public repo.
 
+## Wind noise form for other drivers
+
+`wind-noise.html` can be shared on its own. Phones without the shortcuts unlocked
+read the addresses from `report.enc.json`, which has its own shared password
+(asked once per phone). Its readable source is `report.json`, kept outside the repo:
+
+    SHORTCUTS_PASSWORD='…' node tools/encrypt.mjs path/to/report.json report.enc.json
+
 To publish a change, re-encrypt and commit `links.enc.json`:
 
     SHORTCUTS_PASSWORD='…' node tools/encrypt.mjs path/to/links.json
