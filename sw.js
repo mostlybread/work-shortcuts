@@ -1,6 +1,6 @@
 // Serves the page from the phone's cache so it opens instantly (and offline),
 // then fetches fresh copies in the background for next time.
-const CACHE = "shortcuts-v12";
+const CACHE = "shortcuts-v13";
 const CORE = ["./", "index.html", "wind-noise.html", "wind-noise.webmanifest", "report.enc.json", "links.enc.json", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {

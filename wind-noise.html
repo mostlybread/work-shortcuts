@@ -125,15 +125,6 @@
   <div id="faults" style="display:contents"></div>
 
   <div class="field">
-    <label for="speed">Excessive above</label>
-    <div class="row">
-      <input id="speed" type="number" inputmode="numeric" min="1" max="125" step="1" placeholder="80" required>
-      <span class="unit-suffix">mph</span>
-    </div>
-    <div class="error" id="speed-err"></div>
-  </div>
-
-  <div class="field">
     <label for="name">Name <span class="hint">optional</span></label>
     <input id="name" autocomplete="name">
     <label for="role">Role <span class="hint">optional</span></label>
@@ -308,6 +299,18 @@
       doorErr.id = "door-err-" + id;
       toggles(doors, ["E1", "F1"], d.doors, 0, () => { doorErr.textContent = ""; });
 
+      const speedLabel = make("label", "sub", "Excessive above");
+      const speed = make("input");
+      speed.id = "speed-" + id;
+      speedLabel.htmlFor = speed.id;
+      Object.assign(speed, { type: "number", min: 1, max: 125, step: 1, placeholder: "80", value: d.speed });
+      speed.setAttribute("inputmode", "numeric");
+      const speedErr = make("div", "error");
+      speedErr.id = "speed-err-" + id;
+      speed.addEventListener("input", () => { d.speed = speed.value.trim(); speed.classList.remove("invalid"); speedErr.textContent = ""; });
+      const speedRow = make("div", "row");
+      speedRow.append(speed, make("span", "unit-suffix", "mph"));
+
       const noteLabel = make("label", "sub");
       noteLabel.innerHTML = 'Notes <span class="hint">optional</span>';
       const note = make("textarea");
@@ -316,7 +319,7 @@
       note.value = d.notes;
       note.addEventListener("input", () => { d.notes = note.value; });
 
-      box.append(title, hcLabel, hcRow, hcErr, make("div", "sub", "Door"), doors, doorErr, noteLabel, note);
+      box.append(title, hcLabel, hcRow, hcErr, make("div", "sub", "Door"), doors, doorErr, speedLabel, speedRow, speedErr, noteLabel, note);
       return box;
     }
 
@@ -330,7 +333,7 @@
       const blocks = make("div", "");
       blocks.style.display = "contents";
       const renderCabs = () => {
-        blocks.replaceChildren(...f.cabs.map((c) => cabBlock(u, c, f.cab[c] || (f.cab[c] = { hc: "", doors: [], notes: "" }))));
+        blocks.replaceChildren(...f.cabs.map((c) => cabBlock(u, c, f.cab[c] || (f.cab[c] = { hc: "", doors: [], notes: "", speed: last.speed || "" }))));
       };
       toggles(cabs, ["DMC1", "DMC2"], f.cabs, 0, () => { err.textContent = ""; renderCabs(); });
       renderCabs();
@@ -346,12 +349,11 @@
     toggles($("units"), UNITS, units, 2, renderFaults);
 
     $("date").value = today();
-    $("speed").addEventListener("input", () => { $("speed").classList.remove("invalid"); $("speed-err").textContent = ""; });
 
     // Speed, name, role, pay number and other notes come back from the last report made on this phone.
     let last = {};
     try { last = JSON.parse(store.get(LAST_STORE)) || {}; } catch (e) {}
-    for (const f of ["speed", "name", "role", "pay", "notes"]) if (last[f]) $(f).value = last[f];
+    for (const f of ["name", "role", "pay", "notes"]) if (last[f]) $(f).value = last[f];
 
     // Any change after the email is shown hides it, so an out-of-date email can't be sent.
     $("form").addEventListener("input", (e) => { if (!$("after").contains(e.target)) hideEmail(); });
@@ -374,9 +376,9 @@
           const d = f.cab[c], id = u + "-" + c;
           if (!/^[0-9A-Z]{4}$/.test(d.hc)) fail("hc-err-" + id, "Enter all 4 characters of the headcode.", $("hc-" + id));
           if (!d.doors.length) fail("door-err-" + id, "Pick E1, F1 or both.");
+          if (!(Number(d.speed) > 0)) fail("speed-err-" + id, "Enter the speed in mph.", $("speed-" + id));
         }
       }
-      if (!(Number($("speed").value) > 0)) fail("speed-err", "Enter the speed in mph.", $("speed"));
       if (!$("date").value) $("date").value = today();
       return ok;
     }
@@ -396,11 +398,10 @@
         const f = faults[u];
         for (const c of f.cabs) {
           const d = f.cab[c];
-          lines.push("", "Unit 360" + u + ", " + c, "Headcode: " + d.hc, "Door: " + both(d.doors));
+          lines.push("", "Unit 360" + u + ", " + c, "Headcode: " + d.hc, "Door: " + both(d.doors), "Wind noise excessive above: " + d.speed + " mph");
           if (d.notes.trim()) lines.push("Notes: " + d.notes.trim());
         }
       }
-      lines.push("", "Wind noise excessive above: " + v("speed") + " mph");
       if (v("notes")) lines.push("", "Other notes:", v("notes"));
       lines.push("", "Thanks,");
       if (v("name")) lines.push(v("name"));
@@ -414,7 +415,10 @@
       for (const n of document.querySelectorAll(".error")) n.textContent = "";
       if (!check()) return;
       const saved = {};
-      for (const f of ["speed", "name", "role", "pay", "notes"]) saved[f] = $(f).value.trim();
+      for (const f of ["name", "role", "pay", "notes"]) saved[f] = $(f).value.trim();
+      // The last speed entered is suggested for the next report.
+      const speeds = units.flatMap((u) => faults[u].cabs.map((c) => faults[u].cab[c].speed));
+      saved.speed = speeds[speeds.length - 1];
       store.set(LAST_STORE, JSON.stringify(saved));
       const { subject, body } = email();
       const enc = (s) => encodeURIComponent(s).replace(/%0A/g, "%0D%0A");
