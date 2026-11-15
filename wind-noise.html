@@ -70,6 +70,7 @@
     border: 1px solid var(--line); background: var(--bg); color: var(--fg);
   }
   .chip.mono { font-size: 0.9rem; letter-spacing: 0.02em; }
+  .chip-label { display: block; text-transform: none; font-family: var(--font-body); font-weight: 400; font-size: 0.78rem; letter-spacing: 0; opacity: 0.85; }
   .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
   .prefixes { display: flex; gap: 6px; }
   .prefixes .chip { min-width: 58px; }
@@ -88,6 +89,12 @@
   }
   .after { display: flex; flex-direction: column; gap: 8px; }
   .after[hidden] { display: none; }
+  .parts { display: flex; flex-direction: column; gap: 8px; }
+  .part { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .part-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .part-head .sub { margin: 0; }
+  .part .secondary { min-height: 36px; padding: 0 12px; font-size: 0.85rem; }
+  .part pre { padding: 0; border: 0; background: none; font-size: 0.9rem; user-select: text; -webkit-user-select: text; }
   pre {
     margin: 0; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; font-family: var(--font-body); font-size: 0.85rem;
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
@@ -140,12 +147,9 @@
 
   <button type="submit" class="send">✉️ Create email</button>
   <div class="after" id="after" hidden>
-    <pre id="preview"></pre>
-    <div class="chips two">
-      <button type="button" class="secondary" id="copy">📋 Copy email text</button>
-      <a class="send" id="send">✉️ Send</a>
-    </div>
-    <p class="note">Send opens your mail app with the email filled in. If it doesn't, copy the text and paste it into an email.</p>
+    <div id="parts" class="parts"></div>
+    <a class="send" id="send">✉️ Send</a>
+    <p class="note">Send opens your mail app with everything filled in. If it doesn't, copy each part into a new email.</p>
   </div>
 </form>
 </template>
@@ -218,13 +222,14 @@
   }
 
   // Toggle buttons. max limits how many can be picked at once; picked keeps the choices.
-  function toggles(box, values, picked, max, onChange) {
+  function toggles(box, values, picked, max, onChange, labels) {
     const sync = () => { for (const c of box.children) c.setAttribute("aria-pressed", String(picked.includes(c.dataset.v))); };
     for (const v of values) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "chip mono";
       b.textContent = v;
+      if (labels && labels[v]) b.append(make("span", "chip-label", labels[v]));
       b.dataset.v = v;
       b.addEventListener("click", () => {
         const i = picked.indexOf(v);
@@ -249,6 +254,8 @@
   const longDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const shortDate = (iso) => iso.split("-").reverse().join("/");
   const both = (list) => list.join(" and ");
+  const DOOR_SIDES = { E1: "Driver side", F1: "Non-driver side" };
+  const doorText = (d) => d + " (" + DOOR_SIDES[d].toLowerCase() + ")";
 
   function make(tag, className, text) {
     const n = document.createElement(tag);
@@ -297,7 +304,7 @@
       const doors = make("div", "chips two");
       const doorErr = make("div", "error");
       doorErr.id = "door-err-" + id;
-      toggles(doors, ["E1", "F1"], d.doors, 0, () => { doorErr.textContent = ""; });
+      toggles(doors, ["E1", "F1"], d.doors, 0, () => { doorErr.textContent = ""; }, DOOR_SIDES);
 
       const speedLabel = make("label", "sub", "Excessive above");
       const speed = make("input");
@@ -388,7 +395,7 @@
       const headcodes = [...new Set(units.flatMap((u) => faults[u].cabs.map((c) => faults[u].cab[c].hc)))];
       const subject = "Class 360 cab door wind noise - " + units.map((u) => "360" + u).join(" + ") + " - " + headcodes.join(", ") + " - " + shortDate(v("date"));
       const lines = [
-        "Hello Maintenance Control,",
+        "Hello,",
         "",
         "Please could you log the following report of excessive wind noise from a cab door.",
         "",
@@ -398,7 +405,7 @@
         const f = faults[u];
         for (const c of f.cabs) {
           const d = f.cab[c];
-          lines.push("", "Unit 360" + u + ", " + c, "Headcode: " + d.hc, "Door: " + both(d.doors), "Wind noise excessive above: " + d.speed + " mph");
+          lines.push("", "Unit 360" + u + ", " + c, "Headcode: " + d.hc, "Door: " + both(d.doors.map(doorText)), "Wind noise excessive above: " + d.speed + " mph");
           if (d.notes.trim()) lines.push("Notes: " + d.notes.trim());
         }
       }
@@ -423,14 +430,24 @@
       const { subject, body } = email();
       const enc = (s) => encodeURIComponent(s).replace(/%0A/g, "%0D%0A");
       const params = (to.cc ? "cc=" + encodeURIComponent(to.cc) + "&" : "") + "subject=" + enc(subject) + "&body=" + enc(body);
-      $("preview").textContent = "To: " + to.to + (to.cc ? "\nCC: " + to.cc : "") + "\nSubject: " + subject + "\n\n" + body;
       $("send").href = "mailto:" + to.to + "?" + params;
-      const copy = $("copy");
-      copy.textContent = "📋 Copy email text";
-      copy.onclick = async () => {
-        try { await navigator.clipboard.writeText(body); copy.textContent = "Copied ✓"; }
-        catch (err) { copy.textContent = "Press and hold the text to copy"; }
-      };
+      // To, CC, subject and body each in their own box with a Copy button.
+      const parts = [["To", to.to], ["CC", to.cc], ["Subject", subject], ["Body", body]].filter(([, text]) => text);
+      $("parts").replaceChildren(...parts.map(([name, text]) => {
+        const box = make("div", "part");
+        const head = make("div", "part-head");
+        const copy = make("button", "secondary", "📋 Copy");
+        copy.type = "button";
+        copy.setAttribute("aria-label", "Copy " + name);
+        copy.addEventListener("click", async () => {
+          for (const b of $("parts").querySelectorAll("button")) b.textContent = "📋 Copy";
+          try { await navigator.clipboard.writeText(text); copy.textContent = "Copied ✓"; }
+          catch (err) { copy.textContent = "Press and hold to copy"; }
+        });
+        head.append(make("div", "sub", name), copy);
+        box.append(head, make("pre", "", text));
+        return box;
+      }));
       $("after").hidden = false;
       $("after").scrollIntoView({ behavior: "smooth", block: "start" });
     });
